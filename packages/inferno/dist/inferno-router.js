@@ -1,5 +1,5 @@
 /*!
- * inferno-router v1.0.0-beta42
+ * inferno-router v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -140,7 +140,6 @@ function rest(_args, excluded) {
     }
     return t;
 }
-
 /**
  * Sorts an array according to its `path` prop length
  * @param a
@@ -151,7 +150,7 @@ function pathRankSort(a, b) {
     var aAttr = a.props || emptyObject;
     var bAttr = b.props || emptyObject;
     var diff = rank(bAttr.path) - rank(aAttr.path);
-    return diff || (bAttr.path && aAttr.path) ? (bAttr.path.length - aAttr.path.length) : 0;
+    return diff || ((bAttr.path && aAttr.path) ? (bAttr.path.length - aAttr.path.length) : 0);
 }
 /**
  * Helper function for parsing querystring arrays

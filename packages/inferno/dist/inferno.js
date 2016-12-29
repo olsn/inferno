@@ -1,5 +1,5 @@
 /*!
- * inferno v1.0.0-beta42
+ * inferno v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -142,7 +142,10 @@ function normalizeProps(vNode, props, children) {
         vNode.children = props.children;
     }
     if (props.ref) {
-        vNode.ref = props.ref;
+        delete props.ref;
+    }
+    if (props.key) {
+        delete props.key;
     }
     if (props.events) {
         vNode.events = props.events;
@@ -576,6 +579,23 @@ function applyValue(vNode, dom) {
 function isControlled$1(props) {
     return !isNullOrUndef(props.value);
 }
+function updateChildOptionGroup(vNode, value) {
+    var type = vNode.type;
+    if (type === 'optgroup') {
+        var children = vNode.children;
+        if (isArray(children)) {
+            for (var i = 0; i < children.length; i++) {
+                updateChildOption(children[i], value);
+            }
+        }
+        else if (isVNode(children)) {
+            updateChildOption(children, value);
+        }
+    }
+    else {
+        updateChildOption(vNode, value);
+    }
+}
 function updateChildOption(vNode, value) {
     var props = vNode.props || EMPTY_OBJ;
     var dom = vNode.dom;
@@ -633,16 +653,27 @@ function applyValue$1(vNode, dom) {
     var value = props.value;
     if (isArray(children)) {
         for (var i = 0; i < children.length; i++) {
-            updateChildOption(children[i], value);
+            updateChildOptionGroup(children[i], value);
         }
     }
     else if (isVNode(children)) {
-        updateChildOption(children, value);
+        updateChildOptionGroup(children, value);
     }
 }
 
 function isControlled$2(props) {
     return !isNullOrUndef(props.value);
+}
+function wrappedOnChange$1(e) {
+    var vNode = this.vNode;
+    var events = vNode.events || EMPTY_OBJ;
+    var event = events.onChange;
+    if (event.event) {
+        event.event(event.data, e);
+    }
+    else {
+        event(e);
+    }
 }
 function onTextareaInputChange(e) {
     var vNode = this.vNode;
@@ -675,6 +706,10 @@ function processTextarea(vNode, dom) {
             };
             dom.oninput = onTextareaInputChange.bind(textareaWrapper);
             dom.oninput.wrapped = true;
+            if (props.onChange) {
+                dom.onchange = wrappedOnChange$1.bind(textareaWrapper);
+                dom.onchange.wrapped = true;
+            }
             wrappers.set(dom, textareaWrapper);
         }
         textareaWrapper.vNode = vNode;
@@ -1041,7 +1076,7 @@ function patchComponent(lastVNode, nextVNode, parentDom, lifecycle, context, isS
                     childContext = context;
                 }
                 var lastInput$1 = instance._lastInput;
-                var nextInput$1 = instance._updateComponent(lastState, nextState, lastProps, nextProps, context, false);
+                var nextInput$1 = instance._updateComponent(lastState, nextState, lastProps, nextProps, context, false, false);
                 var didUpdate = true;
                 instance._childContext = childContext;
                 if (isInvalid(nextInput$1)) {
@@ -1566,13 +1601,28 @@ function patchEvent(name, lastValue, nextValue, dom, lifecycle) {
             handleEvent(name, lastValue, nextValue, dom);
         }
         else {
-            if (!isFunction(nextValue) && !isNullOrUndef(nextValue)) {
-                if (process.env.NODE_ENV !== 'production') {
-                    throwError(("an event on a VNode \"" + name + "\". was not a function. Did you try and apply an eventLink to an unsupported event or to an uncontrolled component?"));
+            if (lastValue !== nextValue) {
+                if (!isFunction(nextValue) && !isNullOrUndef(nextValue)) {
+                    var linkEvent = nextValue.event;
+                    if (linkEvent && isFunction(linkEvent)) {
+                        if (!dom._data) {
+                            dom[nameLowerCase] = function (e) {
+                                linkEvent(e.currentTarget._data, e);
+                            };
+                        }
+                        dom._data = nextValue.data;
+                    }
+                    else {
+                        if (process.env.NODE_ENV !== 'production') {
+                            throwError(("an event on a VNode \"" + name + "\". was not a function or a valid linkEvent."));
+                        }
+                        throwError();
+                    }
                 }
-                throwError();
+                else {
+                    dom[nameLowerCase] = nextValue;
+                }
             }
-            dom[nameLowerCase] = nextValue;
         }
     }
 }
@@ -1867,15 +1917,19 @@ function mountComponent(vNode, parentDom, lifecycle, context, isSVG, isClass) {
     if (isClass) {
         var instance = createClassComponentInstance(vNode, type, props, context, isSVG);
         // If instance does not have componentWillUnmount specified we can enable fastUnmount
-        lifecycle.fastUnmount = isUndefined(instance.componentWillUnmount);
         var input = instance._lastInput;
+        var prevFastUnmount = lifecycle.fastUnmount;
         // we store the fastUnmount value, but we set it back to true on the lifecycle
         // we do this so we can determine if the component render has a fastUnmount or not
+        lifecycle.fastUnmount = true;
         instance._vNode = vNode;
         vNode.dom = dom = mount(input, null, lifecycle, instance._childContext, isSVG);
         // we now create a lifecycle for this component and store the fastUnmount value
         var subLifecycle = instance._lifecycle = new Lifecycle();
-        subLifecycle.fastUnmount = lifecycle.fastUnmount;
+        // children lifecycle can fastUnmount if itself does need unmount callback and within its cycle there was none
+        subLifecycle.fastUnmount = isUndefined(instance.componentWillUnmount) && lifecycle.fastUnmount;
+        // higher lifecycle can fastUnmount only if previously it was able to and this children doesnt have any
+        lifecycle.fastUnmount = prevFastUnmount && subLifecycle.fastUnmount;
         if (!isNull(parentDom)) {
             appendChild(parentDom, dom);
         }
@@ -2151,7 +2205,7 @@ function hydrateComponent(vNode, dom, lifecycle, context, isSVG, isClass) {
         }
         var instance = createClassComponentInstance(vNode, type, props, context, _isSVG);
         // If instance does not have componentWillUnmount specified we can enable fastUnmount
-        var fastUnmount = isUndefined(instance.componentWillUnmount);
+        var prevFastUnmount = lifecycle.fastUnmount;
         var input = instance._lastInput;
         // we store the fastUnmount value, but we set it back to true on the lifecycle
         // we do this so we can determine if the component render has a fastUnmount or not
@@ -2159,10 +2213,12 @@ function hydrateComponent(vNode, dom, lifecycle, context, isSVG, isClass) {
         instance._vComponent = vNode;
         instance._vNode = vNode;
         hydrate(input, dom, lifecycle, instance._childContext, _isSVG);
+        // we now create a lifecycle for this component and store the fastUnmount value
         var subLifecycle = instance._lifecycle = new Lifecycle();
-        subLifecycle.fastUnmount = lifecycle.fastUnmount;
-        // we then set the lifecycle fastUnmount value back to what it was before the mount
-        lifecycle.fastUnmount = fastUnmount;
+        // children lifecycle can fastUnmount if itself does need unmount callback and within its cycle there was none
+        subLifecycle.fastUnmount = isUndefined(instance.componentWillUnmount) && lifecycle.fastUnmount;
+        // higher lifecycle can fastUnmount only if previously it was able to and this children doesnt have any
+        lifecycle.fastUnmount = prevFastUnmount && subLifecycle.fastUnmount;
         mountClassComponentCallbacks(vNode, ref, instance, lifecycle);
         options.findDOMNodeEnabled && componentToDOMNodeMap.set(instance, dom);
         vNode.children = instance;
@@ -2379,13 +2435,6 @@ function createRenderer(_parentDom) {
 
 function linkEvent(data, event) {
     return { data: data, event: event };
-}
-
-if (isBrowser) {
-	window.process = window.process || {};
-	window.process.env = window.process.env || {
-		NODE_ENV: 'development'
-	};
 }
 
 if (process.env.NODE_ENV !== 'production') {

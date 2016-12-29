@@ -1,5 +1,5 @@
 /*!
- * inferno-test-utils v1.0.0-beta42
+ * inferno-test-utils v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -71,6 +71,87 @@ var componentHooks = {
     onComponentWillUpdate: true,
     onComponentDidUpdate: true
 };
+function createElement(name, props) {
+    var _children = [], len = arguments.length - 2;
+    while ( len-- > 0 ) _children[ len ] = arguments[ len + 2 ];
+
+    if (isInvalid(name) || isObject(name)) {
+        throw new Error('Inferno Error: createElement() name parameter cannot be undefined, null, false or true, It must be a string, class or function.');
+    }
+    var children = _children;
+    var ref = null;
+    var key = null;
+    var events = null;
+    var flags = 0;
+    if (_children) {
+        if (_children.length === 1) {
+            children = _children[0];
+        }
+        else if (_children.length === 0) {
+            children = undefined;
+        }
+    }
+    if (isString(name)) {
+        flags = 2 /* HtmlElement */;
+        switch (name) {
+            case 'svg':
+                flags = 128 /* SvgElement */;
+                break;
+            case 'input':
+                flags = 512 /* InputElement */;
+                break;
+            case 'textarea':
+                flags = 1024 /* TextareaElement */;
+                break;
+            case 'select':
+                flags = 2048 /* SelectElement */;
+                break;
+            default:
+        }
+        for (var prop in props) {
+            if (prop === 'key') {
+                key = props.key;
+                delete props.key;
+            }
+            else if (prop === 'children' && isUndefined(children)) {
+                children = props.children; // always favour children args, default to props
+            }
+            else if (prop === 'ref') {
+                ref = props.ref;
+            }
+            else if (isAttrAnEvent(prop)) {
+                if (!events) {
+                    events = {};
+                }
+                events[prop] = props[prop];
+                delete props[prop];
+            }
+        }
+    }
+    else {
+        flags = isStatefulComponent(name) ? 4 /* ComponentClass */ : 8 /* ComponentFunction */;
+        if (!isUndefined(children)) {
+            if (!props) {
+                props = {};
+            }
+            props.children = children;
+            children = null;
+        }
+        for (var prop$1 in props) {
+            if (componentHooks[prop$1]) {
+                if (!ref) {
+                    ref = {};
+                }
+                ref[prop$1] = props[prop$1];
+            }
+            else if (prop$1 === 'key') {
+                key = props.key;
+                delete props.key;
+            }
+        }
+    }
+    return inferno.createVNode(flags, name, props, children, events, key, ref);
+}
 
 function isValidElement(obj) {
     var isNotANullObject = isObject(obj) && isNull(obj) === false;
@@ -173,7 +254,10 @@ function normalizeProps(vNode, props, children) {
         vNode.children = props.children;
     }
     if (props.ref) {
-        vNode.ref = props.ref;
+        delete props.ref;
+    }
+    if (props.key) {
+        delete props.key;
     }
     if (props.events) {
         vNode.events = props.events;
@@ -592,6 +676,23 @@ function applyValue(vNode, dom) {
 function isControlled$1(props) {
     return !isNullOrUndef(props.value);
 }
+function updateChildOptionGroup(vNode, value) {
+    var type = vNode.type;
+    if (type === 'optgroup') {
+        var children = vNode.children;
+        if (isArray(children)) {
+            for (var i = 0; i < children.length; i++) {
+                updateChildOption(children[i], value);
+            }
+        }
+        else if (isVNode(children)) {
+            updateChildOption(children, value);
+        }
+    }
+    else {
+        updateChildOption(vNode, value);
+    }
+}
 function updateChildOption(vNode, value) {
     var props = vNode.props || EMPTY_OBJ;
     var dom = vNode.dom;
@@ -649,16 +750,27 @@ function applyValue$1(vNode, dom) {
     var value = props.value;
     if (isArray(children)) {
         for (var i = 0; i < children.length; i++) {
-            updateChildOption(children[i], value);
+            updateChildOptionGroup(children[i], value);
         }
     }
     else if (isVNode(children)) {
-        updateChildOption(children, value);
+        updateChildOptionGroup(children, value);
     }
 }
 
 function isControlled$2(props) {
     return !isNullOrUndef(props.value);
+}
+function wrappedOnChange$1(e) {
+    var vNode = this.vNode;
+    var events = vNode.events || EMPTY_OBJ;
+    var event = events.onChange;
+    if (event.event) {
+        event.event(event.data, e);
+    }
+    else {
+        event(e);
+    }
 }
 function onTextareaInputChange(e) {
     var vNode = this.vNode;
@@ -691,6 +803,10 @@ function processTextarea(vNode, dom) {
             };
             dom.oninput = onTextareaInputChange.bind(textareaWrapper);
             dom.oninput.wrapped = true;
+            if (props.onChange) {
+                dom.onchange = wrappedOnChange$1.bind(textareaWrapper);
+                dom.onchange.wrapped = true;
+            }
             wrappers.set(dom, textareaWrapper);
         }
         textareaWrapper.vNode = vNode;
@@ -1057,7 +1173,7 @@ function patchComponent(lastVNode, nextVNode, parentDom, lifecycle, context, isS
                     childContext = context;
                 }
                 var lastInput$1 = instance._lastInput;
-                var nextInput$1 = instance._updateComponent(lastState, nextState, lastProps, nextProps, context, false);
+                var nextInput$1 = instance._updateComponent(lastState, nextState, lastProps, nextProps, context, false, false);
                 var didUpdate = true;
                 instance._childContext = childContext;
                 if (isInvalid(nextInput$1)) {
@@ -1582,13 +1698,28 @@ function patchEvent(name, lastValue, nextValue, dom, lifecycle) {
             handleEvent(name, lastValue, nextValue, dom);
         }
         else {
-            if (!isFunction(nextValue) && !isNullOrUndef(nextValue)) {
-                if (process.env.NODE_ENV !== 'production') {
-                    throwError(("an event on a VNode \"" + name + "\". was not a function. Did you try and apply an eventLink to an unsupported event or to an uncontrolled component?"));
+            if (lastValue !== nextValue) {
+                if (!isFunction(nextValue) && !isNullOrUndef(nextValue)) {
+                    var linkEvent = nextValue.event;
+                    if (linkEvent && isFunction(linkEvent)) {
+                        if (!dom._data) {
+                            dom[nameLowerCase] = function (e) {
+                                linkEvent(e.currentTarget._data, e);
+                            };
+                        }
+                        dom._data = nextValue.data;
+                    }
+                    else {
+                        if (process.env.NODE_ENV !== 'production') {
+                            throwError(("an event on a VNode \"" + name + "\". was not a function or a valid linkEvent."));
+                        }
+                        throwError();
+                    }
                 }
-                throwError();
+                else {
+                    dom[nameLowerCase] = nextValue;
+                }
             }
-            dom[nameLowerCase] = nextValue;
         }
     }
 }
@@ -1883,15 +2014,19 @@ function mountComponent(vNode, parentDom, lifecycle, context, isSVG, isClass) {
     if (isClass) {
         var instance = createClassComponentInstance(vNode, type, props, context, isSVG);
         // If instance does not have componentWillUnmount specified we can enable fastUnmount
-        lifecycle.fastUnmount = isUndefined(instance.componentWillUnmount);
         var input = instance._lastInput;
+        var prevFastUnmount = lifecycle.fastUnmount;
         // we store the fastUnmount value, but we set it back to true on the lifecycle
         // we do this so we can determine if the component render has a fastUnmount or not
+        lifecycle.fastUnmount = true;
         instance._vNode = vNode;
         vNode.dom = dom = mount(input, null, lifecycle, instance._childContext, isSVG);
         // we now create a lifecycle for this component and store the fastUnmount value
         var subLifecycle = instance._lifecycle = new Lifecycle();
-        subLifecycle.fastUnmount = lifecycle.fastUnmount;
+        // children lifecycle can fastUnmount if itself does need unmount callback and within its cycle there was none
+        subLifecycle.fastUnmount = isUndefined(instance.componentWillUnmount) && lifecycle.fastUnmount;
+        // higher lifecycle can fastUnmount only if previously it was able to and this children doesnt have any
+        lifecycle.fastUnmount = prevFastUnmount && subLifecycle.fastUnmount;
         if (!isNull(parentDom)) {
             appendChild(parentDom, dom);
         }
@@ -2167,7 +2302,7 @@ function hydrateComponent(vNode, dom, lifecycle, context, isSVG, isClass) {
         }
         var instance = createClassComponentInstance(vNode, type, props, context, _isSVG);
         // If instance does not have componentWillUnmount specified we can enable fastUnmount
-        var fastUnmount = isUndefined(instance.componentWillUnmount);
+        var prevFastUnmount = lifecycle.fastUnmount;
         var input = instance._lastInput;
         // we store the fastUnmount value, but we set it back to true on the lifecycle
         // we do this so we can determine if the component render has a fastUnmount or not
@@ -2175,10 +2310,12 @@ function hydrateComponent(vNode, dom, lifecycle, context, isSVG, isClass) {
         instance._vComponent = vNode;
         instance._vNode = vNode;
         hydrate(input, dom, lifecycle, instance._childContext, _isSVG);
+        // we now create a lifecycle for this component and store the fastUnmount value
         var subLifecycle = instance._lifecycle = new Lifecycle();
-        subLifecycle.fastUnmount = lifecycle.fastUnmount;
-        // we then set the lifecycle fastUnmount value back to what it was before the mount
-        lifecycle.fastUnmount = fastUnmount;
+        // children lifecycle can fastUnmount if itself does need unmount callback and within its cycle there was none
+        subLifecycle.fastUnmount = isUndefined(instance.componentWillUnmount) && lifecycle.fastUnmount;
+        // higher lifecycle can fastUnmount only if previously it was able to and this children doesnt have any
+        lifecycle.fastUnmount = prevFastUnmount && subLifecycle.fastUnmount;
         mountClassComponentCallbacks(vNode, ref, instance, lifecycle);
         options.findDOMNodeEnabled && componentToDOMNodeMap.set(instance, dom);
         vNode.children = instance;
@@ -2382,12 +2519,10 @@ function renderIntoDocument(element) {
 function isElement(element) {
     return isValidElement(element);
 }
-
 function isElementOfType(inst, componentClass) {
     return (isValidElement(inst) &&
         inst.type === componentClass);
 }
-
 function isDOMComponent(inst) {
     return !!(inst && inst.nodeType === 1 && inst.tagName);
 }
@@ -2396,7 +2531,6 @@ function isDOMComponentElement(inst) {
         isValidElement(inst) &&
         typeof inst.type === 'string');
 }
-
 function isCompositeComponent(inst) {
     if (isDOMComponent(inst)) {
         return false;
@@ -2405,7 +2539,6 @@ function isCompositeComponent(inst) {
         typeof inst.type.render === 'function' &&
         typeof inst.type.setState === 'function');
 }
-
 function isCompositeComponentWithType(inst, type) {
     if (!isCompositeComponent(inst)) {
         return false;
@@ -2465,8 +2598,16 @@ function scryRenderedDOMComponentsWithClass(root, classNames) {
         return false;
     });
 }
-
-
+function scryRenderedDOMComponentsWithTag(root, tagName) {
+    return findAllInRenderedTree(root, function (inst) {
+        return isDOMComponent(inst) && inst.tagName.toUpperCase() === tagName.toUpperCase();
+    });
+}
+function scryRenderedComponentsWithType(root, componentType) {
+    return findAllInRenderedTree(root, function (inst) {
+        return isCompositeComponentWithType(inst, componentType);
+    });
+}
 function findOneOf(root, option, optionName, finderFn) {
     var all = finderFn(root, option);
     if (all.length > 1) {
@@ -2476,6 +2617,19 @@ function findOneOf(root, option, optionName, finderFn) {
 }
 function findRenderedDOMComponentsWithClass(root, classNames) {
     return findOneOf(root, classNames, 'class', scryRenderedDOMComponentsWithClass);
+}
+function findenderedDOMComponentsWithTag(root, tagName) {
+    return findOneOf(root, tagName, 'tag', scryRenderedDOMComponentsWithTag);
+}
+function findRenderedComponentWithType(root, componentClass) {
+    return findOneOf(root, componentClass, 'component', scryRenderedComponentsWithType);
+}
+function mockComponent(module, mockTagName) {
+    mockTagName = mockTagName || typeof module.type === 'string' ? module.type : 'div';
+    module.prototype.render.mockImplementation(function () {
+        return createElement(mockTagName, null, this.props.children);
+    });
+    return this;
 }
 
 var index = {

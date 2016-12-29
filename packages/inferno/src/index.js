@@ -2,17 +2,10 @@ import {
 	createVNode,
 	cloneVNode
 } from '../../../build/core/VNodes';
-import { warning, NO_OP, isBrowser, EMPTY_OBJ } from '../../../build/shared';
+import { warning, NO_OP, EMPTY_OBJ } from '../../../build/shared';
 import { render, findDOMNode, createRenderer } from '../../../build/DOM/rendering';
 import linkEvent from '../../../build/DOM/events/linkEvent';
 import options from '../../../build/core/options';
-
-if (isBrowser) {
-	window.process = window.process || {};
-	window.process.env = window.process.env || {
-		NODE_ENV: 'development'
-	};
-}
 
 if (process.env.NODE_ENV !== 'production') {
 	Object.freeze(EMPTY_OBJ);

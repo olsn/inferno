@@ -1,5 +1,5 @@
 /*!
- * inferno-component v1.0.0-beta42
+ * inferno-component v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -103,14 +103,13 @@ function addToQueue(component, force, callback) {
                 }
             });
             componentCallbackQueue.delete(component);
-            component._processingSetState = false;
         });
     }
     if (callback) {
         queue.push(callback);
     }
 }
-function queueStateChanges(component, newState, callback) {
+function queueStateChanges(component, newState, callback, sync) {
     if (isFunction(newState)) {
         newState = newState(component.state);
     }
@@ -118,14 +117,12 @@ function queueStateChanges(component, newState, callback) {
         component._pendingState[stateKey] = newState[stateKey];
     }
     if (!component._pendingSetState && isBrowser) {
-        if (component._processingSetState || callback) {
-            addToQueue(component, false, callback);
+        if (sync || component._blockRender) {
+            component._pendingSetState = true;
+            applyState(component, false, callback);
         }
         else {
-            component._pendingSetState = true;
-            component._processingSetState = true;
-            applyState(component, false, callback);
-            component._processingSetState = false;
+            addToQueue(component, false, callback);
         }
     }
     else {
@@ -142,7 +139,7 @@ function applyState(component, force, callback) {
         var props = component.props;
         var context = component.context;
         component._pendingState = {};
-        var nextInput = component._updateComponent(prevState, nextState, props, props, context, force);
+        var nextInput = component._updateComponent(prevState, nextState, props, props, context, force, true);
         var didUpdate = true;
         if (isInvalid(nextInput)) {
             nextInput = createVoidVNode();
@@ -197,7 +194,6 @@ function applyState(component, force, callback) {
 var Component$1 = function Component(props, context) {
     this.state = {};
     this.refs = {};
-    this._processingSetState = false;
     this._blockRender = false;
     this._ignoreSetState = false;
     this._blockSetState = false;
@@ -231,7 +227,23 @@ Component$1.prototype.setState = function setState (newState, callback) {
     }
     if (!this._blockSetState) {
         if (!this._ignoreSetState) {
-            queueStateChanges(this, newState, callback);
+            queueStateChanges(this, newState, callback, false);
+        }
+    }
+    else {
+        if (process.env.NODE_ENV !== 'production') {
+            throwError('cannot update state via setState() in componentWillUpdate().');
+        }
+        throwError();
+    }
+};
+Component$1.prototype.setStateSync = function setStateSync (newState) {
+    if (this._unmounted) {
+        return;
+    }
+    if (!this._blockSetState) {
+        if (!this._ignoreSetState) {
+            queueStateChanges(this, newState, null, true);
         }
     }
     else {
@@ -254,7 +266,7 @@ Component$1.prototype.componentWillUpdate = function componentWillUpdate (nextPr
 };
 Component$1.prototype.getChildContext = function getChildContext () {
 };
-Component$1.prototype._updateComponent = function _updateComponent (prevState, nextState, prevProps, nextProps, context, force) {
+Component$1.prototype._updateComponent = function _updateComponent (prevState, nextState, prevProps, nextProps, context, force, fromSetState) {
     if (this._unmounted === true) {
         if (process.env.NODE_ENV !== 'production') {
             throwError(noOp);
@@ -263,9 +275,11 @@ Component$1.prototype._updateComponent = function _updateComponent (prevState, n
     }
     if ((prevProps !== nextProps || nextProps === inferno.EMPTY_OBJ) || prevState !== nextState || force) {
         if (prevProps !== nextProps || nextProps === inferno.EMPTY_OBJ) {
-            this._blockRender = true;
-            this.componentWillReceiveProps(nextProps, context);
-            this._blockRender = false;
+            if (!fromSetState) {
+                this._blockRender = true;
+                this.componentWillReceiveProps(nextProps, context);
+                this._blockRender = false;
+            }
             if (this._pendingSetState) {
                 nextState = Object.assign({}, nextState, this._pendingState);
                 this._pendingSetState = false;

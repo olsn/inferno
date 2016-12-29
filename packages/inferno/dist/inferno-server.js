@@ -1,5 +1,5 @@
 /*!
- * inferno-server v1.0.0-beta42
+ * inferno-server v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -292,7 +292,10 @@ function normalizeProps(vNode, props, children) {
         vNode.children = props.children;
     }
     if (props.ref) {
-        vNode.ref = props.ref;
+        delete props.ref;
+    }
+    if (props.key) {
+        delete props.key;
     }
     if (props.events) {
         vNode.events = props.events;
