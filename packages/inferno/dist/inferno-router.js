@@ -1,5 +1,5 @@
 /*!
- * inferno-router v1.0.0-beta42
+ * inferno-router v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -68,6 +68,26 @@ var isArray = Array.isArray;
 function isString(obj) {
     return typeof obj === 'string';
 }
+
+
+
+
+
+
+
+
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
+}
+var process = _process;
 
 var emptyObject = Object.create(null);
 function decode(val) {
@@ -151,7 +171,7 @@ function pathRankSort(a, b) {
     var aAttr = a.props || emptyObject;
     var bAttr = b.props || emptyObject;
     var diff = rank(bAttr.path) - rank(aAttr.path);
-    return diff || (bAttr.path && aAttr.path) ? (bAttr.path.length - aAttr.path.length) : 0;
+    return diff || ((bAttr.path && aAttr.path) ? (bAttr.path.length - aAttr.path.length) : 0);
 }
 /**
  * Helper function for parsing querystring arrays

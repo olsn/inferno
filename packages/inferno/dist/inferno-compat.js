@@ -1,5 +1,5 @@
 /*!
- * inferno-compat v1.0.0-beta42
+ * inferno-compat v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -389,6 +389,20 @@ function isObject(o) {
     return typeof o === 'object';
 }
 
+
+
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
+}
+
 function isValidElement(obj) {
     var isNotANullObject = isObject(obj) && isNull(obj) === false;
     if (isNotANullObject === false) {
@@ -526,7 +540,7 @@ function createElement$1(name, props) {
     while ( len-- > 0 ) _children[ len ] = arguments[ len + 2 ];
 
     if (isInvalid(name) || isObject(name)) {
-        throw new Error('Inferno Error: createElement() name paramater cannot be undefined, null, false or true, It must be a string, class or function.');
+        throw new Error('Inferno Error: createElement() name parameter cannot be undefined, null, false or true, It must be a string, class or function.');
     }
     var children = _children;
     var ref = null;
@@ -701,6 +715,23 @@ var injectStringRefs = function (originalFunction) {
 
 var createElement = injectStringRefs(createElement$1);
 var cloneElement = injectStringRefs(inferno.cloneVNode);
+
+var oldCreateVNode = inferno.options.createVNode;
+
+inferno.options.createVNode = function (vNode) {
+	var children = vNode.children;
+	var props = vNode.props;
+
+	if (isNullOrUndef(vNode.props)) {
+		props = vNode.props = {};
+	}
+	if (!isNullOrUndef(children) && isNullOrUndef(props.children)) {
+		props.children = children;
+	}
+	if (oldCreateVNode) {
+		oldCreateVNode(vNode);
+	}
+};
 
 // Credit: preact-compat - https://github.com/developit/preact-compat :)
 function shallowDiffers(a, b) {

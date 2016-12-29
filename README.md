@@ -43,7 +43,7 @@ Inferno proves that it is possible to be fast on mobile. Parse-time, load-time, 
 - Highly modular with very few opinions on how things should be done
 - Unlike React and Preact, Inferno has lifecycle events on functional components
 - Supports asynchronous component rendering using `requestIdleCallback`
-- Unlike Preact and other React-like libraries, Inferno has controlled components for input/select/textarea elements
+- Unlike Preact and other React-like libraries, Inferno has dd components for input/select/textarea elements
 
 ## Benchmarks
 
@@ -109,24 +109,24 @@ Alternatively, you can get started with Inferno using the [Inferno Boilerplate](
 Core package:
 
 ```sh
-npm install --save inferno@beta42
+npm install --save inferno@beta44
 ```
 
 Addons:
 
 ```sh
 # ES2015 class components
-npm install --save inferno-component@beta42
+npm install --save inferno-component@beta44
 # server-side rendering
-npm install --save inferno-server@beta42
+npm install --save inferno-server@beta44
 # routing
-npm install --save inferno-router@beta42
+npm install --save inferno-router@beta44
 ```
 
 Pre-bundled files for browser consumption can be found on [our cdnjs](https://cdnjs.com/libraries/inferno):
 
 ```
-https://cdnjs.cloudflare.com/ajax/libs/inferno/1.0.0-beta42/inferno.min.js
+https://cdnjs.cloudflare.com/ajax/libs/inferno/1.0.0-beta44/inferno.min.js
 ```
 
 ### Creating Virtual DOM
@@ -138,17 +138,17 @@ npm install --save-dev babel-plugin-inferno@beta17
 
 #### Hyperscript:
 ```sh
-npm install --save inferno-hyperscript@beta42
+npm install --save inferno-hyperscript@beta44
 ```
 
 #### createElement:
 ```sh
-npm install --save inferno-create-element@beta42
+npm install --save inferno-create-element@beta44
 ```
 
 ### Compatibility with existing React apps
 ```sh
-npm install --save-dev inferno-compat@beta42
+npm install --save-dev inferno-compat@beta44
 ```
 
 Note: Make sure you read more about [`inferno-compat`](https://github.com/trueadm/inferno/tree/master/packages/inferno-compat) before using it.
@@ -189,11 +189,11 @@ Inferno has its own [JSX Babel plugin](https://github.com/trueadm/babel-plugin-i
 
 Like React, Inferno also uses a light-weight synthetic event system in certain places (although both event systems differ massively). Inferno's event system provides highly efficient delegation and an event helper called [`linkEvent`](https://github.com/trueadm/inferno/blob/master/README.md#linkevent-package-inferno).
  
-One major difference between Inferno and React is that Inferno does not rename events or changes how they work by default. Inferno only specifies that events should be camel cased, rather than lower case. Lower case events will bypass
+One major difference between Inferno and React is that Inferno does not rename events or change how they work by default. Inferno only specifies that events should be camel cased, rather than lower case. Lower case events will bypass
 Inferno's event system in favour of using the native event system supplied by the browser. For example, when detecting changes on an `<input>` element, in React you'd use `onChange`, with Inferno you'd use `onInput` instead (the
 native DOM event is `oninput`).
 
-As this is feature is a very recent addition to Inferno, there are only a handful of events that use Inferno's event system. They are outlined below:
+This feature is a very recent addition to Inferno, so there are only a handful of events that use Inferno's event system:
 - `onClick`
 - `onDblClick`
 - `onMouseMove`
@@ -207,6 +207,15 @@ As this is feature is a very recent addition to Inferno, there are only a handfu
 - `onChange`
 
 More events are expected to be supported in future versions.
+
+## Controlled Components
+
+In HTML, form elements such as `<input>`, `<textarea>`, and `<select>` typically maintain their own state and update it based on user input. 
+In Inferno, mutable state is typically kept in the state property of components, and only updated with `setState()`.
+
+We can combine the two by making the Inferno state be the "single source of truth". Then the Inferno component that renders a form also 
+controls what happens in that form on subsequent user input. An input form element whose value is controlled by 
+Inferno in this way is called a "controlled component".
 
 ## Inferno Top-Level API
 
@@ -225,7 +234,7 @@ Warning: If the container element is not empty before rendering, the content of 
 
 ### `createRenderer` (package: `inferno`)
 
-`createRenderer` allows for functional composition when rendering content to the DOM. An example of this is shown below:
+`createRenderer` allows for functional composition when rendering content to the DOM. Example:
 
 ```javascript
 import Inferno from 'inferno';
@@ -318,7 +327,7 @@ const vNode = Inferno.createVNode(2, 'div', { className: 'example' }, 'Hello wor
 Inferno.render(vNode, container);
 ```
 
-The first argument for `createVNode()` is a value from [`VNodeFlags`](https://github.com/trueadm/inferno/tree/master/packages/inferno-vnode-flags), this is numerical value that used to tell Inferno what the VNode is meant to describe on the page.
+The first argument for `createVNode()` is a value from [`VNodeFlags`](https://github.com/trueadm/inferno/tree/master/packages/inferno-vnode-flags), this is a numerical value that tells Inferno what the VNode describes on the page.
 
 ### `cloneVNode` (package: `inferno`)
 ```js
@@ -362,14 +371,14 @@ Inferno.render(newVNode, container);
 
 Once enabled via `options.findDOMNodeEnabled()` at the start of an application, `findDOMNode()` is enabled.
 
-Note: we recommend using a `ref` callback on a component to find its instance, rather than using `findDOMNode()`. `findDOMNode()` cannot be used on functional components and it introduces a significant impact to performance.
+Note: we recommend using a `ref` callback on a component to find its instance, rather than using `findDOMNode()`. `findDOMNode()` cannot be used on functional components and it introduces a significant performance impact.
 
 If a component has been mounted into the DOM, this returns the corresponding native browser DOM element. This method is useful for reading values out of the DOM, such as form field values and performing DOM measurements. 
 In most cases, you can attach a ref to the DOM node and avoid using `findDOMNode()` at all. When render returns null or false, `findDOMNode()` returns null.
 
 ### `linkEvent` (package: `inferno`)
 
-`linkEvent()` is a helper function that allows attachment of `props`/`state`/`context` or other data to events without needing to `bind()` them or use arrow functions/closures. It works by hooking into Inferno's event system (so make sure the event you are using will use Inferno's event system). This is extremely useful when dealing with events in functional components. Below is an example:
+`linkEvent()` is a helper function that allows attachment of `props`/`state`/`context` or other data to events without needing to `bind()` them or use arrow functions/closures. This is extremely useful when dealing with events in functional components. Below is an example:
 
 ```jsx
 import Inferno, { linkEvent } from 'inferno';
@@ -401,7 +410,7 @@ class MyComponent extends Component {
 }
 ```
 
-`linkEvent()` offers better performance than binding an event in a class constructor and using arrow functions, so where possible, it should be used.
+`linkEvent()` offers better performance than binding an event in a class constructor and using arrow functions, so use it where possible.
 
 ### `renderToString` (package: `inferno-server`)
 
@@ -424,7 +433,7 @@ This enables `findDOMNode()`. We strongly recommend against using this API as it
 
 #### - `recyclingEnabled` (default: `true`)
 
-This enables DOM node recycling within Inferno, so that DOM nodes are re-used upon diposal. It can have significant performance benefits, but may also experiences side-effects with custom elements.
+This enables DOM node recycling within Inferno, so that DOM nodes are re-used upon diposal. It can have significant performance benefits, but may also cause side-effects with custom elements.
 
 ## Functional component hooks
 
@@ -456,19 +465,65 @@ Inferno.render(<FunctionalComponent onComponentDidMount={ mounted } />, document
 
 Hooks provide powerful lifecycle events to functional components, allowing you to build components without being forced to use ES2015 classes.
 
+## Development vs Production modes
+
+By default, Inferno will run in development mode. Development mode provides extra checks and better error messages at the cost of slower performance and larger code to parse.
+When using Inferno in a production environment, it is highly recommended that you turn off development mode.
+
+### Running Inferno on Node JS
+
+Ensure the environment variable `process.env.NODE_ENV` is set to `production`.
+
+### Building Inferno for use in a browser
+
+When running Inferno on the browser using Webpack or Rollup, a replacement will need to occur during your build.
+
+#### Webpack
+
+Use the following configuration in your Webpack build:
+
+```js
+  ...
+	plugins: [
+    new webpack.DefinePlugin({
+      'process.env': {
+        'NODE_ENV': JSON.stringify('production')
+      }
+    })
+  ]
+```
+
+#### Rollup
+
+Use the following configuration in your Rollup build:
+
+```js
+const replace = require('rollup-plugin-replace');
+```
+
+```js
+  ...
+	plugins: [
+		replace({
+			'process.env.NODE_ENV': JSON.stringify('production'),
+		})
+  ]
+```
+
 ## Browser Support
 
 Inferno supports IE11+, Edge, Chrome, Firefox and Safari 8+. In order to support IE8+, Inferno requires polyfills for the following JavaScript features:
 
+- [Promise object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
 - [Map object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map)
 - [Object.keys](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Object/keys)
 - [Object.assign](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Object/assign)
 
-Potential solutions including using the [es5-shim](https://github.com/es-shims/es5-shim) for ES5 features and [es6-shim](https://github.com/paulmillr/es6-shim) from ES2015 features.
+Potential solutions include using the [es5-shim](https://github.com/es-shims/es5-shim) for ES5 features and [es6-shim](https://github.com/paulmillr/es6-shim) from ES2015 features.
 
 ### Custom namespaces
 
-Inferno wants to always deliver great performance and in order to do so, it has to make intelligent assumptions about the state of the DOM and the elements available to mutate. Custom namespaces conflict with this idea and change the schema of how different elements and attributes might work; so Inferno makes no attempt to support namespaces. Instead, SVG namespaces are automatically applied to elements and attributes based on their `tag name`.
+Inferno wants to always deliver great performance. In order to do so, it has to make intelligent assumptions about the state of the DOM and the elements available to mutate. Custom namespaces conflict with this idea and change the schema of how different elements and attributes might work, so Inferno makes no attempt to support namespaces. Instead, SVG namespaces are automatically applied to elements and attributes based on their `tag name`.
 
 ## Community
 

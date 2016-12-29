@@ -1,5 +1,5 @@
 /*!
- * inferno-mobx v1.0.0-beta42
+ * inferno-mobx v1.0.0-beta44
  * (c) 2016 Ryan Megidov
  * Released under the MIT License.
  */
@@ -41,6 +41,18 @@ function warning(condition, message) {
     if (!condition) {
         console.error(message);
     }
+}
+
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
 }
 
 var specialKeys = {

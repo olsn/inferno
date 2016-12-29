@@ -13,6 +13,7 @@ import {
 	isStringOrNumber,
 	isUndefined,
 	throwError,
+	process
 } from '../shared';
 import {
 	createVoidVNode,
@@ -330,7 +331,7 @@ export function patchComponent(lastVNode, nextVNode, parentDom, lifecycle: Lifec
 					childContext = context;
 				}
 				const lastInput = instance._lastInput;
-				let nextInput = instance._updateComponent(lastState, nextState, lastProps, nextProps, context, false);
+				let nextInput = instance._updateComponent(lastState, nextState, lastProps, nextProps, context, false, false);
 				let didUpdate = true;
 
 				instance._childContext = childContext;
@@ -868,13 +869,27 @@ export function patchEvent(name, lastValue, nextValue, dom, lifecycle) {
 		if (delegatedProps[name]) {
 			handleEvent(name, lastValue, nextValue, dom);
 		} else {
-			if (!isFunction(nextValue) && !isNullOrUndef(nextValue)) {
-				if (process.env.NODE_ENV !== 'production') {
-					throwError(`an event on a VNode "${ name }". was not a function. Did you try and apply an eventLink to an unsupported event?`);
+			if (lastValue !== nextValue) {
+				if (!isFunction(nextValue) && !isNullOrUndef(nextValue)) {
+					const linkEvent = nextValue.event;
+
+					if (linkEvent && isFunction(linkEvent)) {
+						if (!dom._data) {
+							dom[nameLowerCase] = function (e) {
+								linkEvent(e.currentTarget._data, e);
+							};
+						}
+						dom._data = nextValue.data;
+					} else {
+						if (process.env.NODE_ENV !== 'production') {
+							throwError(`an event on a VNode "${ name }". was not a function or a valid linkEvent.`);
+						}
+						throwError();
+					}
+				} else {
+					dom[nameLowerCase] = nextValue;
 				}
-				throwError();
 			}
-			dom[nameLowerCase] = nextValue;
 		}
 	}
 }

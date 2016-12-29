@@ -26,7 +26,7 @@
 		"node": true
 	},
 	"rules": {
-		"comma-dangle": 2,
+		"comma-dangle": 0,
 		"no-cond-assign": [2, "except-parens"],
 		"no-console": 0,
 		"no-constant-condition": 2,
@@ -80,6 +80,7 @@
 		"wrap-iife": [2, "inside"],
 		"yoda": 2,
 		"strict": [2, "never"],
+		"no-mixed-operators": 2,
 		"no-delete-var": 2,
 		"no-shadow-restricted-names": 2,
 		"no-unused-vars": 0,

@@ -2,12 +2,14 @@ import {
 	isArray,
 	isFunction,
 	isInvalid,
+	isObject,
 	isNull,
 	isNullOrUndef,
 	isStringOrNumber,
 	isUndefined,
 	throwError,
 	EMPTY_OBJ,
+	process
 } from '../shared';
 import { cloneVNode, isVNode } from '../core/VNodes';
 import {
@@ -173,17 +175,20 @@ export function mountComponent(vNode, parentDom, lifecycle: Lifecycle, context, 
 	if (isClass) {
 		const instance = createClassComponentInstance(vNode, type, props, context, isSVG);
 		// If instance does not have componentWillUnmount specified we can enable fastUnmount
-		lifecycle.fastUnmount = isUndefined(instance.componentWillUnmount);
 		const input = instance._lastInput;
-
+		const prevFastUnmount = lifecycle.fastUnmount;
 		// we store the fastUnmount value, but we set it back to true on the lifecycle
 		// we do this so we can determine if the component render has a fastUnmount or not
+		lifecycle.fastUnmount = true;
 		instance._vNode = vNode;
 		vNode.dom = dom = mount(input, null, lifecycle, instance._childContext, isSVG);
 		// we now create a lifecycle for this component and store the fastUnmount value
 		const subLifecycle = instance._lifecycle = new Lifecycle();
 
-		subLifecycle.fastUnmount = lifecycle.fastUnmount;
+		// children lifecycle can fastUnmount if itself does need unmount callback and within its cycle there was none
+		subLifecycle.fastUnmount = isUndefined(instance.componentWillUnmount) && lifecycle.fastUnmount;
+		// higher lifecycle can fastUnmount only if previously it was able to and this children doesnt have any
+		lifecycle.fastUnmount = prevFastUnmount && subLifecycle.fastUnmount;
 		if (!isNull(parentDom)) {
 			appendChild(parentDom, dom);
 		}
@@ -209,7 +214,13 @@ export function mountClassComponentCallbacks(vNode, ref, instance, lifecycle: Li
 			ref(instance);
 		} else {
 			if (process.env.NODE_ENV !== 'production') {
-				throwError('string "refs" are not supported in Inferno 1.0. Use callback "refs" instead.');
+				if (isStringOrNumber(ref)) {
+					throwError('string "refs" are not supported in Inferno 1.0. Use callback "refs" instead.');
+				} else if (isObject(ref) && (vNode.flags & VNodeFlags.ComponentClass)) {
+					throwError('functional component lifecycle events are not supported on ES2015 class components.');
+				} else {
+					throwError(`a bad value for "ref" was used on component: "${ JSON.stringify(ref) }"`);
+				}
 			}
 			throwError();
 		}

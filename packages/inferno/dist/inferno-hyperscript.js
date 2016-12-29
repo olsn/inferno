@@ -1,5 +1,5 @@
 /*!
- * inferno-hyperscript v1.0.0-beta42
+ * inferno-hyperscript v1.0.0-beta44
  * (c) 2016 undefined
  * Released under the MIT License.
  */
@@ -32,6 +32,21 @@ function isNumber(obj) {
 
 function isUndefined(obj) {
     return obj === undefined;
+}
+
+
+
+
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
 }
 
 var classIdSplit = /([.#]?[a-zA-Z0-9_:-]+)/;

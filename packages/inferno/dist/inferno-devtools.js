@@ -1,5 +1,5 @@
 /*!
- * inferno-devtools v1.0.0-beta42
+ * inferno-devtools v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -43,6 +43,20 @@ function isUndefined(obj) {
 }
 function isObject(o) {
     return typeof o === 'object';
+}
+
+
+
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
 }
 
 function findVNodeFromDom(vNode, dom) {
@@ -397,6 +411,7 @@ function wrapFunctionalComponent(vNode) {
         wrappers.set(originalRender, wrapper);
     }
     vNode.type = wrappers.get(originalRender);
+    vNode.type.defaultProps = originalRender.defaultProps;
     vNode.ref = null;
     vNode.flags = 4 /* ComponentClass */;
 }

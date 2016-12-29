@@ -1,5 +1,5 @@
 /*!
- * inferno-create-element v1.0.0-beta42
+ * inferno-create-element v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -41,6 +41,20 @@ function isObject(o) {
     return typeof o === 'object';
 }
 
+
+
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
+}
+
 var componentHooks = {
     onComponentWillMount: true,
     onComponentDidMount: true,
@@ -54,7 +68,7 @@ function createElement$1(name, props) {
     while ( len-- > 0 ) _children[ len ] = arguments[ len + 2 ];
 
     if (isInvalid(name) || isObject(name)) {
-        throw new Error('Inferno Error: createElement() name paramater cannot be undefined, null, false or true, It must be a string, class or function.');
+        throw new Error('Inferno Error: createElement() name parameter cannot be undefined, null, false or true, It must be a string, class or function.');
     }
     var children = _children;
     var ref = null;

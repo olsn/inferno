@@ -1,5 +1,5 @@
 /*!
- * inferno v1.0.0-beta42
+ * inferno v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -64,6 +64,18 @@ function warning(condition, message) {
     }
 }
 var EMPTY_OBJ = {};
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
+}
+var process = _process;
 
 function applyKeyIfMissing(index, vNode) {
     if (isNull(vNode.key)) {
@@ -576,6 +588,23 @@ function applyValue(vNode, dom) {
 function isControlled$1(props) {
     return !isNullOrUndef(props.value);
 }
+function updateChildOptionGroup(vNode, value) {
+    var type = vNode.type;
+    if (type === 'optgroup') {
+        var children = vNode.children;
+        if (isArray(children)) {
+            for (var i = 0; i < children.length; i++) {
+                updateChildOption(children[i], value);
+            }
+        }
+        else if (isVNode(children)) {
+            updateChildOption(children, value);
+        }
+    }
+    else {
+        updateChildOption(vNode, value);
+    }
+}
 function updateChildOption(vNode, value) {
     var props = vNode.props || EMPTY_OBJ;
     var dom = vNode.dom;
@@ -633,11 +662,11 @@ function applyValue$1(vNode, dom) {
     var value = props.value;
     if (isArray(children)) {
         for (var i = 0; i < children.length; i++) {
-            updateChildOption(children[i], value);
+            updateChildOptionGroup(children[i], value);
         }
     }
     else if (isVNode(children)) {
-        updateChildOption(children, value);
+        updateChildOptionGroup(children, value);
     }
 }
 
@@ -1041,7 +1070,7 @@ function patchComponent(lastVNode, nextVNode, parentDom, lifecycle, context, isS
                     childContext = context;
                 }
                 var lastInput$1 = instance._lastInput;
-                var nextInput$1 = instance._updateComponent(lastState, nextState, lastProps, nextProps, context, false);
+                var nextInput$1 = instance._updateComponent(lastState, nextState, lastProps, nextProps, context, false, false);
                 var didUpdate = true;
                 instance._childContext = childContext;
                 if (isInvalid(nextInput$1)) {
@@ -1566,13 +1595,28 @@ function patchEvent(name, lastValue, nextValue, dom, lifecycle) {
             handleEvent(name, lastValue, nextValue, dom);
         }
         else {
-            if (!isFunction(nextValue) && !isNullOrUndef(nextValue)) {
-                if (process.env.NODE_ENV !== 'production') {
-                    throwError(("an event on a VNode \"" + name + "\". was not a function. Did you try and apply an eventLink to an unsupported event?"));
+            if (lastValue !== nextValue) {
+                if (!isFunction(nextValue) && !isNullOrUndef(nextValue)) {
+                    var linkEvent = nextValue.event;
+                    if (linkEvent && isFunction(linkEvent)) {
+                        if (!dom._data) {
+                            dom[nameLowerCase] = function (e) {
+                                linkEvent(e.currentTarget._data, e);
+                            };
+                        }
+                        dom._data = nextValue.data;
+                    }
+                    else {
+                        if (process.env.NODE_ENV !== 'production') {
+                            throwError(("an event on a VNode \"" + name + "\". was not a function or a valid linkEvent."));
+                        }
+                        throwError();
+                    }
                 }
-                throwError();
+                else {
+                    dom[nameLowerCase] = nextValue;
+                }
             }
-            dom[nameLowerCase] = nextValue;
         }
     }
 }
@@ -1867,15 +1911,19 @@ function mountComponent(vNode, parentDom, lifecycle, context, isSVG, isClass) {
     if (isClass) {
         var instance = createClassComponentInstance(vNode, type, props, context, isSVG);
         // If instance does not have componentWillUnmount specified we can enable fastUnmount
-        lifecycle.fastUnmount = isUndefined(instance.componentWillUnmount);
         var input = instance._lastInput;
+        var prevFastUnmount = lifecycle.fastUnmount;
         // we store the fastUnmount value, but we set it back to true on the lifecycle
         // we do this so we can determine if the component render has a fastUnmount or not
+        lifecycle.fastUnmount = true;
         instance._vNode = vNode;
         vNode.dom = dom = mount(input, null, lifecycle, instance._childContext, isSVG);
         // we now create a lifecycle for this component and store the fastUnmount value
         var subLifecycle = instance._lifecycle = new Lifecycle();
-        subLifecycle.fastUnmount = lifecycle.fastUnmount;
+        // children lifecycle can fastUnmount if itself does need unmount callback and within its cycle there was none
+        subLifecycle.fastUnmount = isUndefined(instance.componentWillUnmount) && lifecycle.fastUnmount;
+        // higher lifecycle can fastUnmount only if previously it was able to and this children doesnt have any
+        lifecycle.fastUnmount = prevFastUnmount && subLifecycle.fastUnmount;
         if (!isNull(parentDom)) {
             appendChild(parentDom, dom);
         }
@@ -1901,7 +1949,15 @@ function mountClassComponentCallbacks(vNode, ref, instance, lifecycle) {
         }
         else {
             if (process.env.NODE_ENV !== 'production') {
-                throwError('string "refs" are not supported in Inferno 1.0. Use callback "refs" instead.');
+                if (isStringOrNumber(ref)) {
+                    throwError('string "refs" are not supported in Inferno 1.0. Use callback "refs" instead.');
+                }
+                else if (isObject(ref) && (vNode.flags & 4 /* ComponentClass */)) {
+                    throwError('functional component lifecycle events are not supported on ES2015 class components.');
+                }
+                else {
+                    throwError(("a bad value for \"ref\" was used on component: \"" + (JSON.stringify(ref)) + "\""));
+                }
             }
             throwError();
         }
@@ -1957,6 +2013,10 @@ function createClassComponentInstance(vNode, Component, props, context, isSVG) {
     if (options.findDOMNodeEnabled) {
         instance._componentToDOMNodeMap = componentToDOMNodeMap;
     }
+    instance._unmounted = false;
+    instance._pendingSetState = true;
+    instance._isSVG = isSVG;
+    instance.componentWillMount();
     var childContext = instance.getChildContext();
     if (!isNullOrUndef(childContext)) {
         instance._childContext = Object.assign({}, context, childContext);
@@ -1964,10 +2024,6 @@ function createClassComponentInstance(vNode, Component, props, context, isSVG) {
     else {
         instance._childContext = context;
     }
-    instance._unmounted = false;
-    instance._pendingSetState = true;
-    instance._isSVG = isSVG;
-    instance.componentWillMount();
     options.beforeRender && options.beforeRender(instance);
     var input = instance.render(props, instance.state, context);
     options.afterRender && options.afterRender(instance);
@@ -2143,7 +2199,7 @@ function hydrateComponent(vNode, dom, lifecycle, context, isSVG, isClass) {
         }
         var instance = createClassComponentInstance(vNode, type, props, context, _isSVG);
         // If instance does not have componentWillUnmount specified we can enable fastUnmount
-        var fastUnmount = isUndefined(instance.componentWillUnmount);
+        var prevFastUnmount = lifecycle.fastUnmount;
         var input = instance._lastInput;
         // we store the fastUnmount value, but we set it back to true on the lifecycle
         // we do this so we can determine if the component render has a fastUnmount or not
@@ -2151,10 +2207,12 @@ function hydrateComponent(vNode, dom, lifecycle, context, isSVG, isClass) {
         instance._vComponent = vNode;
         instance._vNode = vNode;
         hydrate(input, dom, lifecycle, instance._childContext, _isSVG);
+        // we now create a lifecycle for this component and store the fastUnmount value
         var subLifecycle = instance._lifecycle = new Lifecycle();
-        subLifecycle.fastUnmount = lifecycle.fastUnmount;
-        // we then set the lifecycle fastUnmount value back to what it was before the mount
-        lifecycle.fastUnmount = fastUnmount;
+        // children lifecycle can fastUnmount if itself does need unmount callback and within its cycle there was none
+        subLifecycle.fastUnmount = isUndefined(instance.componentWillUnmount) && lifecycle.fastUnmount;
+        // higher lifecycle can fastUnmount only if previously it was able to and this children doesnt have any
+        lifecycle.fastUnmount = prevFastUnmount && subLifecycle.fastUnmount;
         mountClassComponentCallbacks(vNode, ref, instance, lifecycle);
         options.findDOMNodeEnabled && componentToDOMNodeMap.set(instance, dom);
         vNode.children = instance;
@@ -2371,13 +2429,6 @@ function createRenderer(_parentDom) {
 
 function linkEvent(data, event) {
     return { data: data, event: event };
-}
-
-if (isBrowser) {
-	window.process = window.process || {};
-	window.process.env = window.process.env || {
-		NODE_ENV: 'development'
-	};
 }
 
 if (process.env.NODE_ENV !== 'production') {

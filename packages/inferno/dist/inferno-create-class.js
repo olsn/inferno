@@ -1,5 +1,5 @@
 /*!
- * inferno-create-class v1.0.0-beta42
+ * inferno-create-class v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -32,6 +32,21 @@ function isNull(obj) {
 
 function isUndefined(obj) {
     return obj === undefined;
+}
+
+
+
+
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
 }
 
 // don't autobind these methods since they already have guaranteed context.

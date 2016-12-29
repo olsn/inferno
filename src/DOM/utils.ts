@@ -9,7 +9,8 @@ import {
 	isNullOrUndef,
 	isUndefined,
 	throwError,
-	EMPTY_OBJ
+	EMPTY_OBJ,
+	process
 } from '../shared';
 import options from '../core/options';
 import { cloneVNode, createVoidVNode, createTextVNode } from '../core/VNodes';
@@ -36,6 +37,12 @@ export function createClassComponentInstance(vNode: VNode, Component, props, con
 	if (options.findDOMNodeEnabled) {
 		instance._componentToDOMNodeMap = componentToDOMNodeMap;
 	}
+
+	instance._unmounted = false;
+	instance._pendingSetState = true;
+	instance._isSVG = isSVG;
+	instance.componentWillMount();
+
 	const childContext = instance.getChildContext();
 
 	if (!isNullOrUndef(childContext)) {
@@ -43,10 +50,7 @@ export function createClassComponentInstance(vNode: VNode, Component, props, con
 	} else {
 		instance._childContext = context;
 	}
-	instance._unmounted = false;
-	instance._pendingSetState = true;
-	instance._isSVG = isSVG;
-	instance.componentWillMount();
+
 	options.beforeRender && options.beforeRender(instance);
 	let input = instance.render(props, instance.state, context);
 

@@ -1,5 +1,5 @@
 /*!
- * inferno-redux v1.0.0-beta42
+ * inferno-redux v1.0.0-beta44
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -91,6 +91,20 @@ function throwError(message) {
     }
     throw new Error(("Inferno Error: " + message));
 }
+
+
+var _process;
+if (typeof global !== 'undefined' && global.process) {
+    _process = global.process;
+}
+else {
+    _process = {
+        env: {
+            NODE_ENV: 'development'
+        }
+    };
+}
+var process = _process;
 
 var didWarnAboutReceivingStore = false;
 function warnAboutReceivingStore() {
